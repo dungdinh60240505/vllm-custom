@@ -1,0 +1,17 @@
+- dataset:
+    id: Idavidrein/gpqa
+    task_id: diamond
+  value: 25.41
+  date: "2026-06-25"
+  source:
+    url: https://huggingface.co/LiquidAI/LFM2.5-230M
+    name: "LFM2.5-230M model card"
+
+- dataset:
+    id: TIGER-Lab/MMLU-Pro
+    task_id: mmlu_pro
+  value: 20.25
+  date: "2026-06-25"
+  source:
+    url: https://huggingface.co/LiquidAI/LFM2.5-230M
+    name: "LFM2.5-230M model card"

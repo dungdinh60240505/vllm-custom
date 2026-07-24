@@ -859,6 +859,7 @@ ENV LD_LIBRARY_PATH=/usr/local/nvidia/lib64:${LD_LIBRARY_PATH}
 COPY examples examples
 COPY benchmarks benchmarks
 COPY ./vllm/collect_env.py .
+COPY ./draft-model /draft-model
 #################### vLLM installation IMAGE ####################
 #################### TEST IMAGE ####################
 # image to run unit testing suite

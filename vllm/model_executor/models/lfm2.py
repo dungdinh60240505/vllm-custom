@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 from collections.abc import Iterable
 from itertools import islice
-import os
+
 import torch
 import torch.nn as nn
 from transformers import Lfm2Config
@@ -361,10 +361,12 @@ class Lfm2Model(nn.Module):
         #     import logging
         #     logger = logging.getLogger(__name__)
         #     logger.info(
-        #         f"Layer Dropping enabled: dropping {len(self._dropped_layers)}"
-        #         f"/{total_layers} layers (ratio={drop_ratio}): "
-        #         f"{sorted(self._dropped_layers)}"
-        #     )
+        #     "Layer Dropping enabled: dropping %d/%d layers (ratio=%s): %s",
+        #     len(self._dropped_layers),
+        #     total_layers,
+        #     drop_ratio,
+        #     sorted(self._dropped_layers),
+        # )
         # else:
         #     self._dropped_layers = set()
         # #end

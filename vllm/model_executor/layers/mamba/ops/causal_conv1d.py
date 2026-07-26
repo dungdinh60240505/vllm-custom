@@ -938,11 +938,10 @@ def _causal_conv1d_update_kernel(
     if HAS_BIAS:
         bias = bias_ptr + idx_feats
         mask_bias = idx_feats < dim
-        acc_preload = tl.load(bias, mask=mask_bias, other=0.0).to(
-            tl.float32
-        )  # [BLOCK_N]
+        acc_preload = tl.load(bias, mask=mask_bias, other=0.0)
+                    #   .to(tl.float32) # [BLOCK_N]
     else:
-        acc_preload = tl.zeros((BLOCK_N,), dtype=tl.float32)
+        acc_preload = tl.zeros((BLOCK_N,), dtype=tl.float16)
 
     # STEP 4:
     # PRE-LOAD WEIGHTS

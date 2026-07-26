@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 from collections.abc import Iterable
 from itertools import islice
-
+import os
 import torch
 import torch.nn as nn
 from transformers import Lfm2Config
@@ -331,6 +331,43 @@ class Lfm2Model(nn.Module):
         self.start_layer, self.end_layer, self.layers = make_layers(
             config.num_hidden_layers, get_layer, prefix=f"{prefix}.layers"
         )
+        # === LAYER DROPPING OPTIMIZATION ===
+        drop_ratio = float(os.environ.get("LFM2_LAYER_DROP_RATIO", "0.15"))
+        total_layers = self.end_layer - self.start_layer
+        if drop_ratio > 0 and total_layers > 4:
+            # Xác định vùng "giữa" model (bỏ qua 25% đầu và 25% cuối)
+            protected_start = max(1, int(total_layers * 0.25))
+            protected_end = total_layers - max(1, int(total_layers * 0.25))
+            middle_layers = list(range(
+                self.start_layer + protected_start,
+                self.start_layer + protected_end
+            ))
+            # Chỉ drop các ShortConv layer (không drop Attention)
+            droppable = []
+            for idx in middle_layers:
+                layer_type = config.layer_types[idx]
+                if layer_type != "full_attention":
+                    droppable.append(idx)
+            num_to_drop = max(1, int(len(droppable) * drop_ratio / (1.0 - 0.5)))
+            num_to_drop = min(num_to_drop, len(droppable))
+            # Chọn các layer cách đều nhau để drop
+            if num_to_drop > 0:
+                step = len(droppable) / num_to_drop
+                self._dropped_layers = set(
+                    droppable[int(i * step)] for i in range(num_to_drop)
+                )
+            else:
+                self._dropped_layers = set()
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(
+                f"Layer Dropping enabled: dropping {len(self._dropped_layers)}"
+                f"/{total_layers} layers (ratio={drop_ratio}): "
+                f"{sorted(self._dropped_layers)}"
+            )
+        else:
+            self._dropped_layers = set()
+        #end
         self.make_empty_intermediate_tensors = make_empty_intermediate_tensors_factory(
             ["hidden_states", "residual"], config.hidden_size
         )
@@ -361,12 +398,30 @@ class Lfm2Model(nn.Module):
             hidden_states = intermediate_tensors["hidden_states"]
             residual = intermediate_tensors["residual"]
 
-        for layer in islice(self.layers, self.start_layer, self.end_layer):
+        # for layer in islice(self.layers, self.start_layer, self.end_layer):
+        #     hidden_states, residual = layer(
+        #         positions=positions,
+        #         hidden_states=hidden_states,
+        #         residual=residual,
+        #     )
+        for i, layer in enumerate(
+                islice(self.layers, self.start_layer, self.end_layer),
+                start=self.start_layer
+            ):
+            if i in self._dropped_layers:
+                # Skip layer: chỉ thực hiện residual connection
+                # để giữ flow gradient thông suốt
+                if residual is not None:
+                    hidden_states = hidden_states + residual
+                    residual = hidden_states
+                    hidden_states = torch.zeros_like(hidden_states)
+                continue
             hidden_states, residual = layer(
                 positions=positions,
                 hidden_states=hidden_states,
                 residual=residual,
             )
+            #end
         if not get_pp_group().is_last_rank:
             return IntermediateTensors(
                 {"hidden_states": hidden_states, "residual": residual}

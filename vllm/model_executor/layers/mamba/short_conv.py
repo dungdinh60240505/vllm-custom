@@ -47,7 +47,7 @@ class ShortConv(MambaBase, CustomOp):
         self.config = config
         self.layer_idx = layer_idx
         self.conv_dim = dim
-        self.L_cache = config.conv_L_cache
+        self.L_cache = min(config.conv_L_cache, 2)
         self.bias = config.conv_bias
 
         self.conv = ColumnParallelLinear(
